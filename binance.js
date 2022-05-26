@@ -78,7 +78,7 @@ async function GetFutureBalance(symbol) {
 			return Number(response.data.assets[i].availableBalance);
 }
 
-function GetMarketSellQuote(response) {
+function GetMarketSellQuantity(response) {
 	let base_quantity = 0;
 	let fills = response.data.fills;
 	// Assume base asset is USD
@@ -91,7 +91,7 @@ function GetMarketBuyQuantity(response) {
 	let quantity = 0;
 	let fills = response.data.fills;
 	for (let i = 0; i < fills.length; ++i)
-		quantity += Number(fills[i].qty);
+		quantity += Number(fills[i].qty) * 0.99;
 	return quantity;
 }
 
@@ -107,10 +107,12 @@ async function KeepFutureAlive(client) {
 	while (true) {
 		let wait_time = frequency;
 		try {
-			let future_balance = await GetFutureBalance(GetFutureName(base_asset));
+			let future_name = GetFutureName(base_asset);
+			let future_balance = await GetFutureBalance(future_name);
 			if (future_balance <= balance_tolerance) {
+				let future_price = await GetFuturePrice(future_name);
 				logger.log("================================================================================================================================");
-				logger.log(new Date().toString() + " future_price:" + await GetFuturePrice(GetFutureName(base_asset)) + " future_balance:" + future_balance);
+				logger.log(new Date().toString() + " future_price:" + future_price + " future_balance:" + future_balance);
 
 				let locked_balance = await GetLockedBalance(client, base_asset);
 				if (locked_balance > 0) {
@@ -120,7 +122,7 @@ async function KeepFutureAlive(client) {
 
 				let base_transfer_quantity = 0;
 				let base_balance = await GetBalance(client, base_asset);
-				if (base_balance > 0)
+				if (base_balance > 0.1 * quote_need / future_price)
 					base_transfer_quantity = base_balance;
 				else {
 					let quote_balance = await GetBalance(client, quote_asset);
@@ -131,25 +133,26 @@ async function KeepFutureAlive(client) {
 						logger.log(new Date().toString() + " USE " + quote_need + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
 					} else if (down_balance > down_need) {
 						logger.log(new Date().toString() + " down_balance:" + down_balance);
-						let quote_quantity = GetMarketSellQuote(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need }));
+						let quote_quantity = GetMarketSellQuantity(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need }));
 						logger.log(new Date().toString() + " USE " + down_need + " " + base_down_asset + " to SELL " + quote_quantity + " " + quote_asset);
 
 						base_transfer_quantity = GetMarketBuyQuantity(await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity }));
 						logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
 					} else {
-						logger.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!GG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+						logger.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!GAME OVER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 					}
 				}
 
 				if (base_transfer_quantity > 0) {
 					await client.futuresTransfer(base_asset, base_transfer_quantity, 3);
-					logger.log(new Date().toString() + " Transfer " + base_transfer_quantity + " " + base_asset + " to Future " + GetFutureName(base_asset));
-					wait_time = 5000;
+					logger.log(new Date().toString() + " Transfer " + base_transfer_quantity + " " + base_asset + " to Future " + future_name);
+					wait_time = frequency * 5;
 				}
 			}
 		}
 		catch (error) {
 			logger.error(new Date().toString() + " " + error);
+			continue;
 		}
 		await new Promise(resolve => setTimeout(resolve, wait_time));
 	}
