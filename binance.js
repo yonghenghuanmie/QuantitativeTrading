@@ -95,8 +95,7 @@ function GetMarketBuyQuantity(response) {
 	return quantity;
 }
 
-async function KeepFutureAlive(client) {
-	const frequency = 1000;
+async function KeepFutureAlive(data) {
 	const balance_tolerance = 0.05;
 	const quote_asset = "USDT";
 	const base_asset = "ETH";
@@ -104,61 +103,74 @@ async function KeepFutureAlive(client) {
 	const down_need = 400;
 	const base_down_asset = base_asset + "DOWN";
 
-	while (true) {
-		let wait_time = frequency;
-		try {
-			let future_name = GetFutureName(base_asset);
-			let future_balance = await GetFutureBalance(future_name);
-			if (future_balance <= balance_tolerance) {
-				let future_price = await GetFuturePrice(future_name);
-				logger.log("================================================================================================================================");
-				logger.log(new Date().toString() + " future_price:" + future_price + " future_balance:" + future_balance);
+	let future_name = GetFutureName(base_asset);
+	let future_balance = await GetFutureBalance(future_name);
+	if (future_balance <= balance_tolerance) {
+		let future_price = await GetFuturePrice(future_name);
+		logger.log("================================================================================================================================");
+		logger.log(new Date().toString() + " future_price:" + future_price + " future_balance:" + future_balance);
 
-				let locked_balance = await GetLockedBalance(client, base_asset);
-				if (locked_balance > 0) {
-					logger.log(new Date().toString() + " CANCEL all the " + base_asset + quote_asset + " orders");
-					await client.cancelOpenOrders(base_asset + quote_asset);
-				}
+		let locked_balance = await GetLockedBalance(data.client, base_asset);
+		if (locked_balance > 0) {
+			logger.log(new Date().toString() + " CANCEL all the " + base_asset + quote_asset + " orders");
+			await data.client.cancelOpenOrders(base_asset + quote_asset);
+		}
 
-				let base_transfer_quantity = 0;
-				let base_balance = await GetBalance(client, base_asset);
-				if (base_balance > 0.1 * quote_need / future_price)
-					base_transfer_quantity = base_balance;
-				else {
-					let quote_balance = await GetBalance(client, quote_asset);
-					let down_balance = await GetBalance(client, base_down_asset);
-					if (quote_balance > quote_need) {
-						logger.log(new Date().toString() + " quote_balance:" + quote_balance);
-						base_transfer_quantity = GetMarketBuyQuantity(await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_need }));
-						logger.log(new Date().toString() + " USE " + quote_need + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
-					} else if (down_balance > down_need) {
-						logger.log(new Date().toString() + " down_balance:" + down_balance);
-						let quote_quantity = GetMarketSellQuantity(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need }));
-						logger.log(new Date().toString() + " USE " + down_need + " " + base_down_asset + " to SELL " + quote_quantity + " " + quote_asset);
+		let base_transfer_quantity = 0;
+		let base_balance = await GetBalance(data.client, base_asset);
+		if (base_balance > 0.1 * quote_need / future_price) {
+			base_transfer_quantity = base_balance;
+		}
+		else {
+			let quote_balance = await GetBalance(data.client, quote_asset);
+			let down_balance = await GetBalance(data.client, base_down_asset);
+			if (quote_balance > quote_need) {
+				logger.log(new Date().toString() + " quote_balance:" + quote_balance);
+				const response = await data.client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_need });
+				base_transfer_quantity = GetMarketBuyQuantity(response);
+				data.purchase_price.push(response.data.fills[0].price);
+				data.purchase_quantity.push(base_transfer_quantity);
+				logger.log(new Date().toString() + " USE " + quote_need + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
 
-						base_transfer_quantity = GetMarketBuyQuantity(await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity }));
-						logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
-					} else {
-						logger.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!GAME OVER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-					}
-				}
+			} else if (down_balance > down_need) {
+				logger.log(new Date().toString() + " down_balance:" + down_balance);
+				let quote_quantity = GetMarketSellQuantity(await data.client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need }));
+				logger.log(new Date().toString() + " USE " + down_need + " " + base_down_asset + " to SELL " + quote_quantity + " " + quote_asset);
 
-				if (base_transfer_quantity > 0) {
-					await client.futuresTransfer(base_asset, base_transfer_quantity, 3);
-					logger.log(new Date().toString() + " Transfer " + base_transfer_quantity + " " + base_asset + " to Future " + future_name);
-					wait_time = frequency * 5;
-				}
+				const response = await data.client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity });
+				base_transfer_quantity = GetMarketBuyQuantity(response);
+				data.purchase_price.push(response.data.fills[0].price);
+				data.purchase_quantity.push(base_transfer_quantity);
+				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
+
+			} else {
+				logger.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!GAME OVER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 			}
 		}
-		catch (error) {
-			logger.error(new Date().toString() + " " + error);
-			continue;
+
+		if (base_transfer_quantity > 0) {
+			await data.client.futuresTransfer(base_asset, base_transfer_quantity, 3);
+			logger.log(new Date().toString() + " Transfer " + base_transfer_quantity + " " + base_asset + " to Future " + future_name);
+			data.wait_time *= 5;
 		}
-		await new Promise(resolve => setTimeout(resolve, wait_time));
 	}
 }
 
 (async function main() {
 	const client = new Spot(apiKey, apiSecret, { logger: logger });
-	await KeepFutureAlive(client);
+	const frequency = 1000;
+	let purchase_price = [];
+	let purchase_quantity = [];
+
+	while (true) {
+		let data = { client: client, wait_time: frequency, purchase_price: purchase_price, purchase_quantity: purchase_quantity };
+		try {
+			await KeepFutureAlive(data);
+		}
+		catch (error) {
+			logger.error(new Date().toString() + " " + error);
+			continue;
+		}
+		await new Promise(resolve => setTimeout(resolve, data.wait_time));
+	}
 })();
