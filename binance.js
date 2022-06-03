@@ -25,6 +25,13 @@ const future_count_usd = 10;
 const start_price = 2325;
 const profit_percent = 0.05;
 
+const after_tail = new Date("3000-01-01T16:00:00");
+let deliver_date = [
+	new Date("2022-06-24T16:00:00"),
+	new Date("2022-09-30T16:00:00"),
+	after_tail
+];
+
 
 async function GetBalance(client, asset) {
 	let response = await client.account();
@@ -48,12 +55,6 @@ function GenerateSignature(params) {
 
 function GetFutureName(base_asset) {
 	let future_name = base_asset + "USD_";
-	const after_tail = new Date("3000-01-01T16:00:00");
-	let deliver_date = [
-		new Date("2022-06-24T16:00:00"),
-		new Date("2022-09-30T16:00:00"),
-		after_tail
-	];
 	let current_date;
 	for (const date of deliver_date) {
 		if (Date.now() < date.getTime()) {
@@ -174,7 +175,8 @@ function CalculateFutureProfit(future_data, persistence_data) {
 async function SellAsset(future_data, persistence_data) {
 	let target_price;
 	let sell_quantity;
-	if (persistence_data.sell_price.length != 0) {
+	if (persistence_data.sell_price.length != 0 &&
+		persistence_data.sell_price.length == persistence_data.purchase_quantity.length) {
 		target_price = persistence_data.sell_price[persistence_data.sell_price.length - 1];
 		sell_quantity = persistence_data.purchase_quantity[persistence_data.purchase_quantity.length - 1];
 	} else if (persistence_data.purchase_quantity.length != 0) {
@@ -235,13 +237,13 @@ async function SellAsset(future_data, persistence_data) {
 		logger.error(new Date().toString() + " purchase_price.length must equal to purchase_quantity.length and their length greater than sell_price.length.");
 		return;
 	}
-	const future_name = GetFutureName(base_asset);
 
 	while (true) {
-		const future_balance = await GetFutureBalance(future_name);
-		const future_price = await GetFuturePrice(future_name);
-		let future_data = { future_name: future_name, future_balance: future_balance, future_price: future_price, wait_time: frequency };
 		try {
+			const future_name = GetFutureName(base_asset);
+			const future_balance = await GetFutureBalance(future_name);
+			const future_price = await GetFuturePrice(future_name);
+			let future_data = { future_name: future_name, future_balance: future_balance, future_price: future_price, wait_time: frequency };
 			if (await KeepFutureAlive(future_data, persistence_data)) {
 				persistence_data_json = JSON.stringify(persistence_data);
 				fs.writeFileSync("trade_data.json", persistence_data_json);
@@ -250,12 +252,12 @@ async function SellAsset(future_data, persistence_data) {
 				persistence_data_json = JSON.stringify(persistence_data);
 				fs.writeFileSync("trade_data.json", persistence_data_json);
 			}
+			await new Promise(resolve => setTimeout(resolve, future_data.wait_time));
 		}
 		catch (error) {
 			persistence_data = JSON.parse(persistence_data_json);
 			logger.error(new Date().toString() + " " + error);
 			continue;
 		}
-		await new Promise(resolve => setTimeout(resolve, future_data.wait_time));
 	}
 })();
