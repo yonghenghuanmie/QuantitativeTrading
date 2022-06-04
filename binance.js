@@ -133,7 +133,7 @@ async function KeepFutureAlive(future_data, persistence_data) {
 				logger.log(new Date().toString() + " quote_balance:" + quote_balance);
 				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: last_sold_quantity });
 				base_transfer_quantity = GetMarketBuyQuantity(response);
-				persistence_data.purchase_price.push(response.data.fills[0].price);
+				persistence_data.purchase_price.push(Number(response.data.fills[0].price));
 				persistence_data.purchase_quantity.push(base_transfer_quantity);
 				if (persistence_data.sold_quantity.length != 0)
 					persistence_data.sold_quantity.pop();
@@ -146,7 +146,7 @@ async function KeepFutureAlive(future_data, persistence_data) {
 
 				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity });
 				base_transfer_quantity = GetMarketBuyQuantity(response);
-				persistence_data.purchase_price.push(response.data.fills[0].price);
+				persistence_data.purchase_price.push(Number(response.data.fills[0].price));
 				persistence_data.purchase_quantity.push(base_transfer_quantity);
 				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + base_transfer_quantity + " " + base_asset);
 
@@ -205,6 +205,7 @@ async function SellAsset(future_data, persistence_data) {
 		} else {
 			persistence_data.cost_price = future_data.future_price;
 		}
+		future_data.wait_time = frequency * 5;
 		logger.log(new Date().toString() + " USE " + sell_quantity + " " + base_asset + " to SELL " + quote_quantity + " " + quote_asset);
 		return true;
 	}
@@ -231,6 +232,7 @@ async function SellAsset(future_data, persistence_data) {
 	try {
 		const trade_data = fs.readFileSync("trade_data.json").toString();
 		persistence_data_json = trade_data;
+		persistence_data = JSON.parse(trade_data);
 	} catch (error) { }
 	if (persistence_data.purchase_price.length != persistence_data.purchase_quantity.length ||
 		persistence_data.purchase_quantity.length < persistence_data.sell_price.length) {
