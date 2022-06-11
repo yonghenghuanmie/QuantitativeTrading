@@ -24,6 +24,7 @@ const future_count = 1000;
 const future_count_usd = 10;
 const start_price = 2325;
 const profit_percent = 0.05;
+const minimum_down_balance = 1600;
 
 const after_tail = new Date("3000-01-01T16:00:00");
 let deliver_date = [
@@ -191,10 +192,20 @@ async function SellAsset(future_data, persistence_data) {
 		logger.log("================================================================================================================================");
 		logger.log(new Date().toString() + " future_price:" + future_data.future_price + " future_balance:" + future_data.future_balance);
 
+		const down_balance = await GetBalance(client, base_down_asset);
 		await client.futuresTransfer(base_asset, sell_quantity, 4);
 		logger.log(new Date().toString() + " Transfer " + sell_quantity + " " + base_asset + " to Spot " + base_asset + quote_asset);
 		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity }));
-		persistence_data.sold_quantity.push(quote_quantity);
+		if (down_balance >= minimum_down_balance) {
+			persistence_data.sold_quantity.push(quote_quantity);
+		} else {
+			try {
+				await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quantity: down_need * 1.01 });
+			} catch (error) {
+				logger.error(new Date().toString() + " " + error);
+				logger.error(new Date().toString() + " Failed to fill minimum_down_balance, maybe you want to buy it manually?");
+			}
+		}
 		if (persistence_data.sell_price.length != 0) {
 			persistence_data.sell_price.pop();
 			persistence_data.purchase_price.pop();
