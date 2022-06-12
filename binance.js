@@ -195,7 +195,7 @@ async function SellAsset(future_data, persistence_data) {
 		const down_balance = await GetBalance(client, base_down_asset);
 		await client.futuresTransfer(base_asset, sell_quantity, 4);
 		logger.log(new Date().toString() + " Transfer " + sell_quantity + " " + base_asset + " to Spot " + base_asset + quote_asset);
-		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity * (1 - loss_rate) }));
+		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity }));
 		logger.log(new Date().toString() + " USE " + sell_quantity + " " + base_asset + " to SELL " + quote_quantity + " " + quote_asset);
 		if (down_balance > minimum_down_balance) {
 			persistence_data.sold_quantity.push(quote_quantity);
@@ -204,8 +204,10 @@ async function SellAsset(future_data, persistence_data) {
 				await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quantity: down_need * (1 + loss_rate) });
 				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + down_need + " " + base_down_asset);
 			} catch (error) {
-				logger.error(new Date().toString() + " " + error);
-				logger.error(new Date().toString() + " Failed to fill minimum_down_balance, maybe you want to buy it manually?");
+				logger.error(new Date().toString());
+				logger.error("response.status: " + error.response.status);
+				logger.error("response.data: " + JSON.stringify(error.response.data));
+				logger.error("Failed to fill minimum_down_balance, maybe you want to buy it manually?");
 			}
 		}
 		if (persistence_data.sell_price.length != 0) {
@@ -271,7 +273,7 @@ async function SellAsset(future_data, persistence_data) {
 			if (error.response) {
 				logger.error(new Date().toString());
 				logger.error("response.status: " + error.response.status);
-				logger.error("response.data: " + error.response.data);
+				logger.error("response.data: " + JSON.stringify(error.response.data));
 			} else {
 				logger.error(new Date().toString() + " " + error);
 			}
