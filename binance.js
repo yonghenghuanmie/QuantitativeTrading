@@ -191,6 +191,7 @@ async function SellAsset(future_data, persistence_data) {
 	if (future_data.future_price > target_price) {
 		if (future_data.future_balance - sell_quantity <= balance_tolerance) {
 			logger.error(new Date().toString() + " Fatal error! future_data.future_balance - sell_quantity <= balance_tolerance, please check your trade data.");
+			return false;
 		}
 		logger.log("================================================================================================================================");
 		logger.log(new Date().toString() + " future_price:" + future_data.future_price + " future_balance:" + future_data.future_balance);
