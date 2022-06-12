@@ -12,6 +12,7 @@ const logger = new Console({ stdout: output, stderr: errorOutput });
 
 const frequency = 1000;
 const client = new Spot(apiKey, apiSecret, { logger: logger });
+const loss_rate = 0.01;
 // KeepFutureAlive
 const balance_tolerance = 0.05;
 const quote_asset = "USDT";
@@ -103,7 +104,7 @@ function GetMarketBuyQuantity(response) {
 	let quantity = 0;
 	let fills = response.data.fills;
 	for (let i = 0; i < fills.length; ++i)
-		quantity += Number(fills[i].qty) * 0.99;
+		quantity += Number(fills[i].qty) * (1 - loss_rate);
 	return quantity;
 }
 
@@ -159,7 +160,6 @@ async function KeepFutureAlive(future_data, persistence_data) {
 		if (base_transfer_quantity > 0) {
 			await client.futuresTransfer(base_asset, base_transfer_quantity, 3);
 			logger.log(new Date().toString() + " Transfer " + base_transfer_quantity + " " + base_asset + " to Future " + future_data.future_name);
-			future_data.wait_time = frequency * 5;
 			return true;
 		}
 	}
@@ -195,12 +195,14 @@ async function SellAsset(future_data, persistence_data) {
 		const down_balance = await GetBalance(client, base_down_asset);
 		await client.futuresTransfer(base_asset, sell_quantity, 4);
 		logger.log(new Date().toString() + " Transfer " + sell_quantity + " " + base_asset + " to Spot " + base_asset + quote_asset);
-		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity }));
-		if (down_balance >= minimum_down_balance) {
+		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity * (1 - loss_rate) }));
+		logger.log(new Date().toString() + " USE " + sell_quantity + " " + base_asset + " to SELL " + quote_quantity + " " + quote_asset);
+		if (down_balance > minimum_down_balance) {
 			persistence_data.sold_quantity.push(quote_quantity);
 		} else {
 			try {
-				await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quantity: down_need * 1.01 });
+				await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quantity: down_need * (1 + loss_rate) });
+				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + down_need + " " + base_down_asset);
 			} catch (error) {
 				logger.error(new Date().toString() + " " + error);
 				logger.error(new Date().toString() + " Failed to fill minimum_down_balance, maybe you want to buy it manually?");
@@ -216,8 +218,6 @@ async function SellAsset(future_data, persistence_data) {
 		} else {
 			persistence_data.cost_price = future_data.future_price;
 		}
-		future_data.wait_time = frequency * 5;
-		logger.log(new Date().toString() + " USE " + sell_quantity + " " + base_asset + " to SELL " + quote_quantity + " " + quote_asset);
 		return true;
 	}
 	return false;
@@ -256,7 +256,7 @@ async function SellAsset(future_data, persistence_data) {
 			const future_name = GetFutureName(base_asset);
 			const future_balance = await GetFutureBalance(future_name);
 			const future_price = await GetFuturePrice(future_name);
-			let future_data = { future_name: future_name, future_balance: future_balance, future_price: future_price, wait_time: frequency };
+			let future_data = { future_name: future_name, future_balance: future_balance, future_price: future_price };
 			if (await KeepFutureAlive(future_data, persistence_data)) {
 				persistence_data_json = JSON.stringify(persistence_data);
 				fs.writeFileSync("trade_data.json", persistence_data_json);
@@ -265,12 +265,17 @@ async function SellAsset(future_data, persistence_data) {
 				persistence_data_json = JSON.stringify(persistence_data);
 				fs.writeFileSync("trade_data.json", persistence_data_json);
 			}
-			await new Promise(resolve => setTimeout(resolve, future_data.wait_time));
 		}
 		catch (error) {
 			persistence_data = JSON.parse(persistence_data_json);
-			logger.error(new Date().toString() + " " + error);
-			continue;
+			if (error.response) {
+				logger.error(new Date().toString());
+				logger.error("response.status: " + error.response.status);
+				logger.error("response.data: " + error.response.data);
+			} else {
+				logger.error(new Date().toString() + " " + error);
+			}
 		}
+		await new Promise(resolve => setTimeout(resolve, frequency));
 	}
 })();
