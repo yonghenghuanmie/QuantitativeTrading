@@ -144,7 +144,7 @@ async function KeepFutureAlive(future_data, persistence_data) {
 
 			} else if (down_balance > down_need) {
 				logger.log(new Date().toString() + " down_balance:" + down_balance);
-				let quote_quantity = GetMarketSellQuantity(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need }));
+				let quote_quantity = GetMarketSellQuantity(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need.toPrecision(5) }));
 				logger.log(new Date().toString() + " USE " + down_need + " " + base_down_asset + " to SELL " + quote_quantity + " " + quote_asset);
 
 				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity });
@@ -206,7 +206,7 @@ async function SellAsset(future_data, persistence_data) {
 			logger.log(new Date().toString() + " Transfer " + sell_quantity + " " + base_asset + " to Spot " + base_asset + quote_asset);
 			persistence_data.transmitted[persistence_data.transmitted.length - 1] = true;
 		}
-		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity }));
+		const quote_quantity = GetMarketSellQuantity(await client.newOrder(base_asset + quote_asset, "SELL", "MARKET", { quantity: sell_quantity.toPrecision(5) }));
 		logger.log(new Date().toString() + " USE " + sell_quantity + " " + base_asset + " to SELL " + quote_quantity + " " + quote_asset);
 
 		if (down_balance > minimum_down_balance) {
