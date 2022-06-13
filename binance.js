@@ -229,9 +229,11 @@ async function SellAsset(future_data, persistence_data) {
 			persistence_data.sell_price.pop();
 			persistence_data.purchase_price.pop();
 			persistence_data.purchase_quantity.pop();
+			persistence_data.transmitted.pop();
 		} else if (persistence_data.purchase_quantity.length != 0) {
 			persistence_data.purchase_price.pop();
 			persistence_data.purchase_quantity.pop();
+			persistence_data.transmitted.pop();
 		} else {
 			persistence_data.cost_price = future_data.future_price;
 		}
@@ -247,7 +249,7 @@ async function SellAsset(future_data, persistence_data) {
 	// overwrite purchase_price sell rule.
 	let sell_price = [];
 	let sold_quantity = [];
-	let transmitted = [];
+	let transmitted = [false, false, false];
 
 	let persistence_data = {
 		cost_price: cost_price,
