@@ -213,8 +213,8 @@ async function SellAsset(future_data, persistence_data) {
 			persistence_data.sold_quantity.push(quote_quantity);
 		} else {
 			try {
-				await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quantity: down_need * (1 + loss_rate) });
-				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + down_need + " " + base_down_asset);
+				const down_quantity = GetMarketBuyQuantity(await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity }));
+				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + down_quantity + " " + base_down_asset);
 			} catch (error) {
 				logger.error("================================================================================================================================");
 				logger.error(new Date().toString());
