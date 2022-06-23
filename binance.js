@@ -17,22 +17,16 @@ const loss_rate = 0.01;
 const balance_tolerance = 0.05;
 const quote_asset = "USDT";
 const base_asset = "ETH";
+const future_pair = base_asset + "USD";
 const quote_need = 250;
 const down_need = 200;
 const base_down_asset = base_asset + "DOWN";
 // SellAsset
-const future_count = 1000;
+const future_count = 500;
 const future_count_usd = 10;
 const start_price = 2325;
 const profit_percent = 0.05;
 const minimum_down_balance = 1600;
-
-const after_tail = new Date("3000-01-01T16:00:00");
-let deliver_date = [
-	new Date("2022-06-24T16:00:00"),
-	new Date("2022-09-30T16:00:00"),
-	after_tail
-];
 
 
 async function GetBalance(client, asset) {
@@ -55,19 +49,15 @@ function GenerateSignature(params) {
 	return CryptoJS.HmacSHA256(params, apiSecret);
 }
 
-function GetFutureName(base_asset) {
-	let future_name = base_asset + "USD_";
-	let current_date;
-	for (const date of deliver_date) {
-		if (Date.now() < date.getTime()) {
-			current_date = date;
-			break;
-		}
+async function GetFutureName(pair, contract_type) {
+	let response = await axios.get("https://dapi.binance.com/dapi/v1/exchangeInfo", { headers: { "X-MBX-APIKEY": apiKey } });
+	if (response.status != 200) {
+		throw new Date().toString() + " Failed to get future name:" + response.status + " " + response.statusText;
 	}
-	if (current_date.getTime() == after_tail.getTime())
-		throw "Date out of range, please update deliver_date at GetFutureName.";
-	future_name += current_date.getFullYear().toString().substring(2) + (current_date.getMonth() + 1).toString().padStart(2, "0") + current_date.getDate();
-	return future_name;
+	for (let i = 0; i < response.data.symbols.length; ++i)
+		if (response.data.symbols[i].pair == pair &&
+			response.data.symbols[i].contractType == contract_type)
+			return response.data.symbols[i].symbol;
 }
 
 async function GetFuturePrice(symbol) {
@@ -79,16 +69,23 @@ async function GetFuturePrice(symbol) {
 	return response.data[0].price;
 }
 
-async function GetFutureBalance(symbol) {
+async function GetFutureAccount() {
 	const params = "timestamp=" + new Date().getTime();
 	let response = await axios.get("https://dapi.binance.com/dapi/v1/account?" + params + "&signature=" + GenerateSignature(params), { headers: { "X-MBX-APIKEY": apiKey } });
 	if (response.status != 200) {
-		throw new Date().toString() + " Failed to get future balance:" + response.status + " " + response.statusText;
+		throw new Date().toString() + " Failed to get future account:" + response.status + " " + response.statusText;
 	}
+	return response;
+}
 
+function GetFutureBalance(response, symbol) {
 	for (let i = 0; i < response.data.assets.length; ++i)
-		if (response.data.assets[i].asset == "ETH")
+		if (response.data.assets[i].asset == symbol)
 			return Number(response.data.assets[i].availableBalance);
+}
+
+function IsFutureExist(response) {
+	return response.data.positions.length != 0;
 }
 
 function GetMarketSellQuantity(response) {
@@ -106,6 +103,15 @@ function GetMarketBuyQuantity(response) {
 	for (let i = 0; i < fills.length; ++i)
 		quantity += Number(fills[i].qty) * (1 - loss_rate);
 	return quantity;
+}
+
+async function NewFuture(symbol, quantity) {
+	const params = "symbol=" + symbol + "&side=BUY&type=MARKET&quantity=" + quantity + "&timestamp=" + new Date().getTime();
+	let response = await axios.get("https://dapi.binance.com/dapi/v1/order?" + params + "&signature=" + GenerateSignature(params), { headers: { "X-MBX-APIKEY": apiKey } });
+	if (response.status != 200) {
+		throw new Date().toString() + " Failed to new future order:" + response.status + " " + response.statusText;
+	}
+	return response.data.orderId;
 }
 
 async function KeepFutureAlive(future_data, persistence_data) {
@@ -133,7 +139,7 @@ async function KeepFutureAlive(future_data, persistence_data) {
 
 			if (quote_balance > last_sold_quantity) {
 				logger.log(new Date().toString() + " quote_balance:" + quote_balance);
-				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: last_sold_quantity });
+				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: last_sold_quantity.toPrecision(5) });
 				base_transfer_quantity = GetMarketBuyQuantity(response);
 				persistence_data.purchase_price.push(Number(response.data.fills[0].price));
 				persistence_data.purchase_quantity.push(base_transfer_quantity);
@@ -144,10 +150,10 @@ async function KeepFutureAlive(future_data, persistence_data) {
 
 			} else if (down_balance > down_need) {
 				logger.log(new Date().toString() + " down_balance:" + down_balance);
-				let quote_quantity = GetMarketSellQuantity(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need.toPrecision(5) }));
+				let quote_quantity = GetMarketSellQuantity(await client.newOrder(base_down_asset + quote_asset, "SELL", "MARKET", { quantity: down_need }));
 				logger.log(new Date().toString() + " USE " + down_need + " " + base_down_asset + " to SELL " + quote_quantity + " " + quote_asset);
 
-				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity });
+				const response = await client.newOrder(base_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity.toPrecision(5) });
 				base_transfer_quantity = GetMarketBuyQuantity(response);
 				persistence_data.purchase_price.push(Number(response.data.fills[0].price));
 				persistence_data.purchase_quantity.push(base_transfer_quantity);
@@ -213,7 +219,7 @@ async function SellAsset(future_data, persistence_data) {
 			persistence_data.sold_quantity.push(quote_quantity);
 		} else {
 			try {
-				const down_quantity = GetMarketBuyQuantity(await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity }));
+				const down_quantity = GetMarketBuyQuantity(await client.newOrder(base_down_asset + quote_asset, "BUY", "MARKET", { quoteOrderQty: quote_quantity.toPrecision(2) }));
 				logger.log(new Date().toString() + " USE " + quote_quantity + " " + quote_asset + " to BUY " + down_quantity + " " + base_down_asset);
 			} catch (error) {
 				logger.error("================================================================================================================================");
@@ -274,18 +280,26 @@ async function SellAsset(future_data, persistence_data) {
 	}
 
 	while (true) {
+		await new Promise(resolve => setTimeout(resolve, frequency));
 		try {
-			const future_name = GetFutureName(base_asset);
-			const future_balance = await GetFutureBalance(future_name);
+			const future_name = await GetFutureName(future_pair, "CURRENT_QUARTER");
 			const future_price = await GetFuturePrice(future_name);
+			const account_info = await GetFutureAccount();
+			const future_balance = GetFutureBalance(account_info, base_asset);
 			let future_data = { future_name: future_name, future_balance: future_balance, future_price: future_price };
+			if (!IsFutureExist(account_info)) {
+				await NewFuture(future_name, future_count);
+				continue;
+			}
 			if (await KeepFutureAlive(future_data, persistence_data)) {
 				persistence_data_json = JSON.stringify(persistence_data);
 				fs.writeFileSync("trade_data.json", persistence_data_json);
+				continue;
 			}
 			if (await SellAsset(future_data, persistence_data)) {
 				persistence_data_json = JSON.stringify(persistence_data);
 				fs.writeFileSync("trade_data.json", persistence_data_json);
+				continue;
 			}
 		}
 		catch (error) {
@@ -300,6 +314,5 @@ async function SellAsset(future_data, persistence_data) {
 				logger.error(new Date().toString() + " " + error);
 			}
 		}
-		await new Promise(resolve => setTimeout(resolve, frequency));
 	}
 })();
