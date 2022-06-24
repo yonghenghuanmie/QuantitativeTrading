@@ -22,6 +22,7 @@ const quote_need = 250;
 const down_need = 200;
 const base_down_asset = base_asset + "DOWN";
 // SellAsset
+const leverage = 50;
 const future_count = 500;
 const future_count_usd = 10;
 const start_price = 2325;
@@ -93,8 +94,13 @@ function GetFutureBalance(response, symbol) {
 			return Number(response.data.assets[i].availableBalance);
 }
 
-function IsFutureExist(response) {
-	return response.data.positions.length != 0;
+function IsFutureExist(symbol, response) {
+	for (let i = 0; i < response.data.positions.length; ++i)
+		if (response.data.positions[i].symbol == symbol &&
+			response.data.positions[i].positionSide == "LONG") {
+			return Number(response.data.positions[i].positionAmt) != 0;
+		}
+	return false;
 }
 
 function GetMarketSellQuantity(response) {
@@ -115,8 +121,16 @@ function GetMarketBuyQuantity(response) {
 }
 
 async function NewFuture(symbol, quantity) {
-	const params = "symbol=" + symbol + "&side=BUY&type=MARKET&quantity=" + quantity + "&timestamp=" + new Date().getTime();
-	let response = await axios.get("https://dapi.binance.com/dapi/v1/order?" + params + "&signature=" + GenerateSignature(params), { headers: { "X-MBX-APIKEY": apiKey } });
+	logger.log("================================================================================================================================");
+	let params = "symbol=" + symbol + "&leverage=" + leverage + "&timestamp=" + new Date().getTime();
+	let response = await axios.post("https://dapi.binance.com/dapi/v1/leverage?" + params + "&signature=" + GenerateSignature(params), "", { headers: { "X-MBX-APIKEY": apiKey } });
+	if (response.status != 200) {
+		throw new Date().toString() + " Failed to set future leverage:" + response.status + " " + response.statusText;
+	}
+	logger.log(new Date().toString() + " SET future order on " + symbol + " to " + leverage + " leverage");
+
+	params = "symbol=" + symbol + "&side=BUY&positionSide=LONG&type=MARKET&quantity=" + quantity + "&timestamp=" + new Date().getTime();
+	response = await axios.post("https://dapi.binance.com/dapi/v1/order?" + params + "&signature=" + GenerateSignature(params), "", { headers: { "X-MBX-APIKEY": apiKey } });
 	if (response.status != 200) {
 		throw new Date().toString() + " Failed to new future order:" + response.status + " " + response.statusText;
 	}
@@ -297,7 +311,7 @@ async function SellAsset(future_data, persistence_data) {
 			const account_info = await GetFutureAccount();
 			const future_balance = GetFutureBalance(account_info, base_asset);
 			let future_data = { future_name: future_name, future_balance: future_balance, future_price: future_price };
-			if (!IsFutureExist(account_info)) {
+			if (!IsFutureExist(future_name, account_info)) {
 				await NewFuture(future_name, future_count);
 				continue;
 			}
