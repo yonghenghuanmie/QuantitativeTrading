@@ -27,6 +27,9 @@ const future_count_usd = 10;
 const start_price = 2325;
 const profit_percent = 0.05;
 const minimum_down_balance = 1600;
+// GetFutureName
+let future_name_cache = "";
+let future_name_count = 0;
 
 
 async function GetBalance(client, asset) {
@@ -50,14 +53,20 @@ function GenerateSignature(params) {
 }
 
 async function GetFutureName(pair, contract_type) {
-	let response = await axios.get("https://dapi.binance.com/dapi/v1/exchangeInfo", { headers: { "X-MBX-APIKEY": apiKey } });
-	if (response.status != 200) {
-		throw new Date().toString() + " Failed to get future name:" + response.status + " " + response.statusText;
+	if (future_name_cache == "" || ++future_name_count == 0) {
+		let response = await axios.get("https://dapi.binance.com/dapi/v1/exchangeInfo", { headers: { "X-MBX-APIKEY": apiKey } });
+		if (response.status != 200) {
+			throw new Date().toString() + " Failed to get future name:" + response.status + " " + response.statusText;
+		}
+		for (let i = 0; i < response.data.symbols.length; ++i)
+			if (response.data.symbols[i].pair == pair &&
+				response.data.symbols[i].contractType == contract_type) {
+				future_name_cache = response.data.symbols[i].symbol;
+				break;
+			}
 	}
-	for (let i = 0; i < response.data.symbols.length; ++i)
-		if (response.data.symbols[i].pair == pair &&
-			response.data.symbols[i].contractType == contract_type)
-			return response.data.symbols[i].symbol;
+	future_name_count %= 60;
+	return future_name_cache;
 }
 
 async function GetFuturePrice(symbol) {
@@ -111,6 +120,7 @@ async function NewFuture(symbol, quantity) {
 	if (response.status != 200) {
 		throw new Date().toString() + " Failed to new future order:" + response.status + " " + response.statusText;
 	}
+	logger.log(new Date().toString() + " NEW future order on " + symbol + " with " + quantity);
 	return response.data.orderId;
 }
 
