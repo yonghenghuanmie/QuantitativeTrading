@@ -3,6 +3,12 @@
 *	@date 2022.5.25
 */
 
+const fs = require('fs');
+const axios = require('axios');
+const CryptoJS = require("crypto-js");
+const { Console } = require('console');
+const { Spot } = require('@binance/connector');
+
 const apiKey = 'eUNQo4d9VZXesfiIQp5jNGjqQ2VmxZw1XI1ySln6HBBn1aAfROCU5oXdjwYjouFG';
 const apiSecret = fs.readFileSync(".secret").toString().trim();
 
@@ -54,7 +60,8 @@ function GenerateSignature(params) {
 }
 
 async function GetFutureName(pair, contract_type) {
-	if (future_name_cache == "" || ++future_name_count == 0) {
+	if (future_name_cache == "" || ++future_name_count % 60 == 0) {
+		future_name_count = 0;
 		let response = await axios.get("https://dapi.binance.com/dapi/v1/exchangeInfo", { headers: { "X-MBX-APIKEY": apiKey } });
 		if (response.status != 200) {
 			throw new Date().toString() + " Failed to get future name:" + response.status + " " + response.statusText;
@@ -66,7 +73,6 @@ async function GetFutureName(pair, contract_type) {
 				break;
 			}
 	}
-	future_name_count %= 60;
 	return future_name_cache;
 }
 
