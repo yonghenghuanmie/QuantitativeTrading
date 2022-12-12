@@ -11,14 +11,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-#   - name: copy
-#     uses: appleboy/scp-action@v0.0.1
-#     with:
-#       host: "127.0.0.1"
-#       username: root
-#       password: ${{secrets.VPS_PASSWORD}}
-#       source: "*"
-#       target: "~/binance"
+    - name: copy
+      uses: appleboy/scp-action@v0.0.1
+      with:
+        host: "127.0.0.1"
+        username: root
+        password: ${{secrets.VPS_PASSWORD}}
+        source: "*"
+        target: "~/binance"
 
     - name: run
       uses: appleboy/ssh-action@v0.1.6
@@ -26,4 +26,3 @@ jobs:
         host: ${{secrets.VPS}}
         password: ${{secrets.VSP_PASSWORD}}
         script: systemctl restart binance
-        script_stop: echo "::error"
