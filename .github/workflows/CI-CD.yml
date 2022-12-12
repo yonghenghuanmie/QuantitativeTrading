@@ -14,19 +14,16 @@ jobs:
     - name: copy
       uses: appleboy/scp-action@v0.0.1
       with:
-        username: root,
-        host: ${{secrets.VPS}},
-        password: ${{secrets.VPS_PASSWORD}},
-        source: ./*,
-        target: ~/binance
+        username: root
+        host: ${{secrets.VPS}}
+        password: ${{secrets.VPS_PASSWORD}}
+        source: "*"
+        target: "~/binance"
 
     - name: run
       uses: appleboy/ssh-action@v0.1.6
       with:
-        host: ${{secrets.VPS}},
-        password: ${{secrets.VSP_PASSWORD}},
+        host: ${{secrets.VPS}}
+        password: ${{secrets.VSP_PASSWORD}}
         script: systemctl restart binance
-
-    - name: prompt
-      if: failure()
-      run: echo "::error"
+        script_stop: echo "::error"
