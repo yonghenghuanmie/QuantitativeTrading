@@ -4,9 +4,6 @@ on:
     
 env:
   PROJECT_PATH: "~/QuantitativeTrading"
-    
-permissions:
-  contents: read
 
 jobs:
   deploy:
