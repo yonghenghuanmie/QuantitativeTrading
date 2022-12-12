@@ -14,7 +14,7 @@ jobs:
     - name: copy
       uses: appleboy/scp-action@v0.0.1
       with:
-        host: 47.74.57.131
+        host: "47.74.57.131"
         username: root
         password: ${{secrets.VPS_PASSWORD}}
         source: "*"
