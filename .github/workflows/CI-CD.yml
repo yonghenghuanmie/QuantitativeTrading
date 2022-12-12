@@ -11,14 +11,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: copy
-      uses: appleboy/scp-action@v0.0.1
-      with:
-        host: ${{ secrets.VPS }}
-        username: root
-        password: ${{ secrets.VPS_PASSWORD }}
-        source: "*"
-        target: "~/binance"
+#    - name: copy
+#      uses: appleboy/scp-action@v0.0.1
+#      with:
+#        host: ${{ secrets.VPS }}
+#        username: root
+#        password: ${{ secrets.VPS_PASSWORD }}
+#        source: "*"
+#        target: "~/binance"
 
     - name: run
       uses: appleboy/ssh-action@v0.1.6
