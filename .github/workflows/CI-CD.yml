@@ -1,0 +1,32 @@
+on:
+  push:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: copy
+      uses: appleboy/scp-action@v0.0.1
+      with:
+        username: root,
+        host: ${{VPS}},
+        password: ${{VPS_PASSWORD}},
+        source: ./*,
+        target: ~/binance
+
+    - name: run
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{VPS}},
+        password: ${{VSP_PASSWORD}},
+        script: systemctl restart binance
+
+    - name: prompt
+      if: failure()
+      run: echo "::error"
