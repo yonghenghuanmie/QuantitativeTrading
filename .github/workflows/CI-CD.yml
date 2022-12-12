@@ -1,13 +1,16 @@
 on:
   push:
     branches: [ "master" ]
-
+    
+env:
+  PROJECT_PATH: "~/QuantitativeTrading"
+    
 permissions:
   contents: read
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v3
 
