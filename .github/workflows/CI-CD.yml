@@ -15,7 +15,7 @@ jobs:
       uses: appleboy/scp-action@v0.0.1
       with:
         username: root
-        host: ${{secrets.VPS}}
+        host: luoxuemantian.top
         password: ${{secrets.VPS_PASSWORD}}
         source: "*"
         target: "~/binance"
