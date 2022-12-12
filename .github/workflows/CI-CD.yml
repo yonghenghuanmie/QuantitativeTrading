@@ -14,9 +14,9 @@ jobs:
 #    - name: copy
 #      uses: appleboy/scp-action@v0.0.1
 #      with:
-#        host: ${{ secrets.VPS }}
+#        host: ${{secrets.VPS}}
 #        username: root
-#        password: ${{ secrets.VPS_PASSWORD }}
+#        password: ${{secrets.VPS_PASSWORD}}
 #        source: "*"
 #        target: "~/binance"
 
@@ -24,5 +24,5 @@ jobs:
       uses: appleboy/ssh-action@v0.1.6
       with:
         host: ${{secrets.VPS}}
-        password: ${{secrets.VSP_PASSWORD}}
+        password: ${{secrets.VPS_PASSWORD}}
         script: systemctl restart binance
