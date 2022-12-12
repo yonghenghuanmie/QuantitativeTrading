@@ -15,16 +15,16 @@ jobs:
       uses: appleboy/scp-action@v0.0.1
       with:
         username: root,
-        host: ${{VPS}},
-        password: ${{VPS_PASSWORD}},
+        host: ${{secrets.VPS}},
+        password: ${{secrets.VPS_PASSWORD}},
         source: ./*,
         target: ~/binance
 
     - name: run
       uses: appleboy/ssh-action@v0.1.6
       with:
-        host: ${{VPS}},
-        password: ${{VSP_PASSWORD}},
+        host: ${{secrets.VPS}},
+        password: ${{secrets.VSP_PASSWORD}},
         script: systemctl restart binance
 
     - name: prompt
