@@ -11,7 +11,7 @@ jobs:
     - name: copy
       uses: Burnett01/rsync-deployments@5.2.1
       with:
-        switches: av
+        switches: -av
         remote_user: root
         remote_host: ${{secrets.VPS}}
         remote_key: ${{secrets.VPS_KEY}}
