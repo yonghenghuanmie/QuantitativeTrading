@@ -321,16 +321,17 @@ async function SellAsset(future_data, persistence_data) {
 				await NewFuture(future_name, future_count);
 				continue;
 			}
-			if (await KeepFutureAlive(future_data, persistence_data)) {
-				persistence_data_json = JSON.stringify(persistence_data);
-				fs.writeFileSync("trade_data.json", persistence_data_json);
-				continue;
-			}
-			if (await SellAsset(future_data, persistence_data)) {
-				persistence_data_json = JSON.stringify(persistence_data);
-				fs.writeFileSync("trade_data.json", persistence_data_json);
-				continue;
-			}
+			// if (await KeepFutureAlive(future_data, persistence_data)) {
+			// 	persistence_data_json = JSON.stringify(persistence_data);
+			// 	fs.writeFileSync("trade_data.json", persistence_data_json);
+			// 	continue;
+			// }
+			// if (await SellAsset(future_data, persistence_data)) {
+			// 	persistence_data_json = JSON.stringify(persistence_data);
+			// 	fs.writeFileSync("trade_data.json", persistence_data_json);
+			// 	continue;
+			// }
+
 		}
 		catch (error) {
 			persistence_data = JSON.parse(persistence_data_json);
