@@ -16,7 +16,7 @@ jobs:
 #      with:
 #        host: ${{secrets.VPS}}
 #        username: root
-#        password: ${{secrets.VPS_PASSWORD}}
+#        key: ${{secrets.VPS_KEY}}
 #        source: "*"
 #        target: "~/binance"
 
@@ -24,5 +24,5 @@ jobs:
       uses: appleboy/ssh-action@v0.1.6
       with:
         host: ${{secrets.VPS}}
-        password: ${{secrets.VPS_PASSWORD}}
+        key: ${{secrets.VPS_KEY}}
         script: systemctl restart binance
