@@ -1,27 +1,23 @@
 on:
   push:
     branches: [ "master" ]
-    
-env:
-  PROJECT_PATH: "~/QuantitativeTrading"
 
 jobs:
   deploy:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
 
-#    - name: copy
-#      uses: appleboy/scp-action@v0.0.1
-#      with:
-#        host: ${{secrets.VPS}}
-#        username: root
-#        key: ${{secrets.VPS_KEY}}
-#        source: "*"
-#        target: "~/binance"
+    - name: copy
+      uses: appleboy/scp-action@v0.1.3
+      with:
+        host: ${{secrets.VPS}}
+        key: ${{secrets.VPS_KEY}}
+        source: "*"
+        target: "~/binance"
 
     - name: run
-      uses: fifsky/ssh-action@master
+      uses: fifsky/ssh-action@v0.0.6
       with:
         host: ${{secrets.VPS}}
         key: ${{secrets.VPS_KEY}}
