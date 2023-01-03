@@ -141,6 +141,8 @@ async function NewFuture(symbol, quantity) {
 		throw new Date().toString() + " Failed to new future order:" + response.status + " " + response.statusText;
 	}
 	logger.log(new Date().toString() + " NEW future order on " + symbol + " with " + quantity);
+	// Make sure future exist.
+	await new Promise(resolve => setTimeout(resolve, frequency*5));
 	return response.data.orderId;
 }
 
